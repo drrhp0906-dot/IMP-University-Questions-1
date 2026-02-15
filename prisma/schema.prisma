@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Subject: Main categories like Pathology, Pharmacology, Microbiology
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#3b82f6") // Default blue color for UI
+  icon        String?  // Icon name for UI
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  systems     System[]
+  questions   Question[]
+  
+  @@map("subjects")
+}
+
+// System: Organ systems under each subject (e.g., Cardiovascular, Respiratory)
+model System {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  order       Int      @default(0) // Order in textbook sequence
+  subjectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  marksSections MarksSection[]
+  questions     Question[]
+  
+  @@unique([name, subjectId])
+  @@map("systems")
+}
+
+// MarksSection: Different mark categories (10, 8, 5, 4, 3, 2, 1 markers)
+model MarksSection {
+  id       String   @id @default(cuid())
+  marks    Int      // The mark value: 10, 8, 5, 4, 3, 2, 1
+  label    String   // Display label: "10 Markers", "8 Markers", etc.
+  systemId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  system    System     @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  questions Question[]
+  
+  @@unique([marks, systemId])
+  @@map("marks_sections")
+}
+
+// Question: The main question entity
+model Question {
+  id              String   @id @default(cuid())
+  title           String   // Main topic/title
+  description     String?  // Full question text
+  repeatCount     Int      @default(0) // How many times repeated
+  years           String   @default("[]") // JSON array of years when asked
+  importanceScore Float    @default(0) // Calculated importance score
+  globalImportance Float   @default(0.5) // Manual importance factor (0-1)
+  notes           String?  // Additional notes
+  isBookmarked    Boolean  @default(false) // User bookmark
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  subjectId      String
+  systemId       String
+  marksSectionId String
+  
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  system       System       @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  marksSection MarksSection @relation(fields: [marksSectionId], references: [id], onDelete: Cascade)
+  files        File[]
+  folders      Folder[]
+  
+  @@map("questions")
+}
+
+// Folder: For organizing reference files
+model Folder {
+  id          String   @id @default(cuid())
+  name        String
+  questionId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  files    File[]
+  
+  @@map("folders")
+}
+
+// File: Reference files (PDF, DOCX, PPT, Images)
+model File {
+  id          String   @id @default(cuid())
+  name        String   // Original file name
+  type        String   // File type: pdf, docx, ppt, image
+  url         String   // File path or URL
+  size        Int      @default(0) // File size in bytes
+  description String?  // File description
+  questionId  String
+  folderId    String?  // Optional folder
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  folder   Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  
+  @@map("files")
+}
+
+// Statistics: Global counter for dashboard
+model Statistics {
+  id             String   @id @default(cuid())
+  totalQuestions Int      @default(0)
+  totalFiles     Int      @default(0)
+  totalSubjects  Int      @default(0)
+  totalSystems   Int      @default(0)
+  lastUpdated    DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  
+  @@map("statistics")
+}
+
+// Setting: Application settings
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("settings")
+}
